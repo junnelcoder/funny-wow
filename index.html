@@ -1,16 +1,30 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Fun Website</title>
+<meta charset="UTF-8">
+<title>Tap The Dot Game</title>
+<link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-<h1>Welcome to My Fun Website</h1>
+<h1>🎯 Tap The Dot!</h1>
+<p>Tap the moving dot as many times as possible in 10 seconds.</p>
 
-<button onclick="random()">Click for Random Number</button>
+<div id="score">Score: 0</div>
+<div id="timer">Time: 10</div>
 
-<p id="result"></p>
+<div id="gameArea">
+<div id="dot"></div>
+</div>
+
+<button onclick="startGame()">Start Game</button>
+
+<!-- AD AREA -->
+<div class="ad">
+AD SPACE
+<!-- Paste ad network script here later -->
+</div>
 
 <script src="script.js"></script>
 
