@@ -1,47 +1,81 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reaction Speed Game</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0a1a">
+<title>Reaction Speed Challenge</title>
 <link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
 </head>
-
 <body>
 
-<header>
-<h1>⚡ Reaction Speed Challenge</h1>
-</header>
-
-<!-- TOP BANNER -->
-<div class="ad-container">
+<!-- TOP BANNER AD -->
+<div class="ad-banner top-ad">
   <script async="async" data-cfasync="false" src="https://pl28922396.effectivegatecpm.com/f5aa5a0511243938dbe180ab3b4fa201/invoke.js"></script>
-<div id="container-f5aa5a0511243938dbe180ab3b4fa201"></div>
+  <div id="container-f5aa5a0511243938dbe180ab3b4fa201"></div>
 </div>
 
-<main>
+<div class="wrapper">
 
-<div id="gameBox">
-<p id="message">Tap START and wait for green...</p>
+  <header>
+    <h1>REACTION<span>SPEED</span></h1>
+    <div class="stats-bar">
+      <div class="stat">
+        <span class="stat-label">BEST</span>
+        <span id="bestDisplay">--</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">STREAK</span>
+        <span id="streakDisplay">0</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <div id="gameBox" onclick="handleTap()">
+      <div id="countdown" class="hidden"></div>
+      <p id="message">Tap START to play</p>
+    </div>
+
+    <div id="resultPanel" class="hidden">
+      <div id="reactionTime" class="big-time"></div>
+      <div id="feedbackMsg" class="feedback"></div>
+      <div id="improvementMsg" class="improvement"></div>
+    </div>
+
+    <div class="btn-row">
+      <button id="startBtn" class="btn-primary" onclick="startGame()">START</button>
+      <button id="replayBtn" class="btn-replay hidden" onclick="startGame()">PLAY AGAIN</button>
+    </div>
+
+    <div class="leaderboard">
+      <h2>TOP PLAYERS TODAY</h2>
+      <ol id="leaderboardList"></ol>
+    </div>
+
+    <div id="shareSection" class="share-section hidden">
+      <p class="share-label">Challenge your friends</p>
+      <div class="share-row">
+        <button class="share-btn fb" onclick="shareScore('facebook')">Facebook</button>
+        <button class="share-btn tw" onclick="shareScore('twitter')">Twitter / X</button>
+        <button class="share-btn wa" onclick="shareScore('whatsapp')">WhatsApp</button>
+      </div>
+    </div>
+
+  </main>
 </div>
 
-<button onclick="startGame()">START</button>
-
-<div id="result"></div>
-
-<button onclick="share()">Share Score</button>
-
-</main>
-
-<!-- BOTTOM BANNER -->
-<div class="ad-container">
-<!-- OPTIONAL SECOND BANNER -->
+<!-- BOTTOM BANNER AD -->
+<div class="ad-banner bottom-ad">
+  <!-- OPTIONAL SECOND BANNER -->
 </div>
 
 <script src="script.js"></script>
 
-<!-- POPUNDER SCRIPT (PUT AT BOTTOM) -->
+<!-- POPUNDER -->
 <script src="https://pl28922377.effectivegatecpm.com/29/f9/87/29f98774e586912b3dbc41d052553de8.js"></script>
-
 </body>
 </html>
