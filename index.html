@@ -2,28 +2,28 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Tap The Dot Game</title>
+<title>Reaction Speed Game</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-<h1>🎯 Tap The Dot!</h1>
-<p>Tap the moving dot as many times as possible in 10 seconds.</p>
+<h1>⚡ Reaction Speed Test</h1>
 
-<div id="score">Score: 0</div>
-<div id="timer">Time: 10</div>
-
-<div id="gameArea">
-<div id="dot"></div>
+<div id="gameBox">
+<p id="message">Tap START and wait for green...</p>
 </div>
 
-<button onclick="startGame()">Start Game</button>
+<button onclick="startGame()">START</button>
+
+<div id="result"></div>
+
+<button onclick="share()">Share Score</button>
 
 <!-- AD AREA -->
 <div class="ad">
-AD SPACE
-<!-- Paste ad network script here later -->
+AD AREA
 </div>
 
 <script src="script.js"></script>
