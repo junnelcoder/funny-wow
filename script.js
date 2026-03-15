@@ -1,57 +1,61 @@
-let score=0
-let time=10
-let gameRunning=false
+let startTime
+let ready=false
+let timeout
 
-const dot=document.getElementById("dot")
-const scoreText=document.getElementById("score")
-const timerText=document.getElementById("timer")
-
-function randomPosition(){
-
-let x=Math.random()*260
-let y=Math.random()*260
-
-dot.style.left=x+"px"
-dot.style.top=y+"px"
-
-}
-
-dot.onclick=function(){
-
-if(!gameRunning) return
-
-score++
-scoreText.innerText="Score: "+score
-
-randomPosition()
-
-}
+const gameBox=document.getElementById("gameBox")
+const message=document.getElementById("message")
+const result=document.getElementById("result")
 
 function startGame(){
 
-score=0
-time=10
-gameRunning=true
+result.innerHTML=""
+message.innerText="Wait for green..."
+gameBox.style.background="#444"
 
-scoreText.innerText="Score: 0"
-timerText.innerText="Time: 10"
+ready=false
 
-randomPosition()
+let delay=Math.random()*3000+2000
 
-let countdown=setInterval(()=>{
+timeout=setTimeout(()=>{
 
-time--
-timerText.innerText="Time: "+time
+gameBox.style.background="green"
+message.innerText="TAP NOW!"
 
-if(time<=0){
+startTime=Date.now()
+ready=true
 
-clearInterval(countdown)
-gameRunning=false
-
-alert("Game Over! Score: "+score)
+},delay)
 
 }
 
-},1000)
+gameBox.onclick=function(){
+
+if(!ready){
+
+clearTimeout(timeout)
+
+message.innerText="Too soon! Try again."
+return
+
+}
+
+let reaction=Date.now()-startTime
+
+result.innerHTML="Your reaction time: "+reaction+" ms"
+
+ready=false
+message.innerText="Tap START to play again."
+
+}
+
+function share(){
+
+let text="My reaction time is amazing! Try beating me!"
+
+let url=window.location.href
+
+window.open(
+"https://www.facebook.com/sharer/sharer.php?u="+url+"&quote="+text
+)
 
 }
