@@ -1,206 +1,405 @@
-/* === STATE === */
-let startTime, timeout, countdownInterval;
-let ready = false, inGame = false;
-let lastScore = null;
-let streak = parseInt(localStorage.getItem('rsg_streak') || '0');
-let best    = parseInt(localStorage.getItem('rsg_best')   || '0');
+/* ==============================================
+   BrainPulse — script.js
+   Tool: Daily Cognitive Brain Score Tracker
+   Tests: Reaction Speed · Number Memory · Logic
+============================================== */
 
-/* === DOM === */
-const gameBox       = document.getElementById('gameBox');
-const message       = document.getElementById('message');
-const countdown     = document.getElementById('countdown');
-const resultPanel   = document.getElementById('resultPanel');
-const reactionTime  = document.getElementById('reactionTime');
-const feedbackMsg   = document.getElementById('feedbackMsg');
-const improvMsg     = document.getElementById('improvementMsg');
-const startBtn      = document.getElementById('startBtn');
-const replayBtn     = document.getElementById('replayBtn');
-const shareSection  = document.getElementById('shareSection');
-const bestDisplay   = document.getElementById('bestDisplay');
-const streakDisplay = document.getElementById('streakDisplay');
+/* ===== STATE ===== */
+const state = {
+  screen: 'home',
+  currentTest: 0,
+  scores: { reaction: 0, memory: 0, logic: 0 },
+  testInProgress: false,
+};
 
-/* === FAKE LEADERBOARD === */
-const fakeNames = ['Alex','Sam','Kai','Mia','Leo','Nova','Zeke','Aria','Finn','Jade'];
-const fakeBase  = [141,148,153,159,165,172,178,185,192,201];
+/* ===== STORAGE HELPERS ===== */
+const Store = {
+  get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
+};
 
-function buildLeaderboard(yourScore) {
-  const list = document.getElementById('leaderboardList');
-  list.innerHTML = '';
-  let entries = fakeNames.map((n, i) => ({ name: n, ms: fakeBase[i] + Math.floor(Math.random() * 8) }));
-  if (yourScore) {
-    entries.push({ name: 'You', ms: yourScore, isYou: true });
-    entries.sort((a, b) => a.ms - b.ms);
+function getHistory()   { return Store.get('bp_history')  || []; }
+function getBest()      { return Store.get('bp_best')      || 0;  }
+function getStreak()    { return Store.get('bp_streak')    || 0;  }
+function getTotalTests(){ return Store.get('bp_total')     || 0;  }
+function getTodayDate() { return new Date().toISOString().slice(0,10); }
+function getTodayScore(){ const h = getHistory(); return h.find(x => x.date === getTodayDate()) || null; }
+
+/* ===== SCREEN ROUTER ===== */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  state.screen = id;
+}
+
+/* ===== HOME SCREEN ===== */
+function goHome() { renderHome(); showScreen('home'); }
+
+function renderHome() {
+  document.getElementById('h-streak').textContent = getStreak();
+  document.getElementById('h-best').textContent   = getBest() ? getBest() : '—';
+  document.getElementById('h-tests').textContent  = getTotalTests();
+
+  const today = getTodayScore();
+  const btn   = document.getElementById('startTestBtn');
+  const note  = document.getElementById('dailyNote');
+  const prev  = document.getElementById('todayPreview');
+  const msg   = document.getElementById('todayMsg');
+
+  if (today) {
+    msg.textContent = `Today's score: ${today.score}/100 — ${gradeLabel(today.score).grade}`;
+    btn.classList.add('disabled');
+    btn.innerHTML = '<span class="btn-icon">✓</span><span>Test Complete for Today</span>';
+    note.textContent = 'Come back tomorrow for a new challenge!';
+    prev.style.borderStyle = 'solid';
+  } else {
+    msg.textContent = 'Ready to test your mind?';
+    btn.classList.remove('disabled');
+    btn.innerHTML = '<span class="btn-icon">⚡</span><span>Start Today\'s Test</span>';
+    note.textContent = 'Your score resets at midnight';
+    prev.style.borderStyle = 'dashed';
   }
-  entries.slice(0, 8).forEach((e, i) => {
-    const li = document.createElement('li');
-    if (e.isYou) li.classList.add('is-you');
-    li.innerHTML = '<span class="rank">#'+(i+1)+'</span><span class="name">'+e.name+'</span><span class="time">'+e.ms+'ms</span>';
-    list.appendChild(li);
-  });
+
+  renderHistory();
 }
 
-/* === AUDIO === */
-const ctx = (typeof AudioContext !== 'undefined') ? new AudioContext() :
-            (typeof webkitAudioContext !== 'undefined') ? new webkitAudioContext() : null;
-
-function beep(freq, dur, type, vol) {
-  if (!ctx) return;
-  try {
-    var osc = ctx.createOscillator(), gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.type = type || 'sine'; osc.frequency.value = freq;
-    gain.gain.setValueAtTime(vol || 0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-    osc.start(); osc.stop(ctx.currentTime + dur);
-  } catch(e) {}
+function renderHistory() {
+  const list = getHistory().slice(-7).reverse();
+  const el   = document.getElementById('historyList');
+  if (!list.length) { el.innerHTML = '<p style="font-size:13px;color:var(--muted);text-align:center">No scores yet. Take your first test!</p>'; return; }
+  el.innerHTML = list.map(e => `
+    <div class="hist-row">
+      <span class="hist-date">${e.date.slice(5)}</span>
+      <div class="hist-bar-wrap"><div class="hist-bar" style="width:${e.score}%"></div></div>
+      <span class="hist-score">${e.score}</span>
+    </div>`).join('');
 }
 
-function vibrate(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
+/* ===== AD GATE ===== */
+function initTest() {
+  if (getTodayScore()) return;
+  showScreen('adgate');
 
-/* === INIT === */
-function init() {
-  bestDisplay.textContent   = best ? best + 'ms' : '--';
-  streakDisplay.textContent = streak;
-  buildLeaderboard(null);
-}
+  let secs = 5;
+  const countEl = document.getElementById('gateCount');
+  const fillEl  = document.getElementById('gateFill');
+  countEl.textContent = secs;
+  fillEl.style.width  = '0%';
 
-/* === START GAME === */
-function startGame() {
-  if (ctx && ctx.state === 'suspended') ctx.resume();
-  clearTimeout(timeout);
-  clearInterval(countdownInterval);
+  // Animate bar
+  let pct = 0;
+  const barInterval = setInterval(() => {
+    pct += 100 / (secs * 20);
+    fillEl.style.width = Math.min(pct, 100) + '%';
+  }, 50);
 
-  ready = false; inGame = true;
-  resultPanel.classList.add('hidden');
-  shareSection.classList.add('hidden');
-  startBtn.classList.add('hidden');
-  replayBtn.classList.add('hidden');
-  setBoxState('wait');
-
-  var count = 3;
-  countdown.classList.remove('hidden');
-  countdown.textContent = count;
-  message.textContent = '';
-  beep(440, 0.15, 'square', 0.2);
-
-  countdownInterval = setInterval(function() {
-    count--;
-    if (count > 0) {
-      countdown.textContent = count;
-      beep(440, 0.15, 'square', 0.2);
-    } else {
-      clearInterval(countdownInterval);
-      countdown.classList.add('hidden');
-      beginWait();
+  // Countdown
+  const tick = setInterval(() => {
+    secs--;
+    countEl.textContent = secs;
+    if (secs <= 0) {
+      clearInterval(tick);
+      clearInterval(barInterval);
+      fillEl.style.width = '100%';
+      setTimeout(startTests, 300);
     }
-  }, 800);
+  }, 1000);
 }
 
-function beginWait() {
-  message.textContent = 'Wait for green...';
-  setBoxState('wait');
-  timeout = setTimeout(goGreen, Math.random() * 3000 + 1500);
+/* ===== TEST FLOW ===== */
+function startTests() {
+  state.currentTest = 1;
+  state.scores = { reaction: 0, memory: 0, logic: 0 };
+  updateProgress(1);
+  showScreen('test');
+  setTimeout(startTest1, 100);
 }
 
-function goGreen() {
-  setBoxState('ready');
-  message.textContent = 'TAP NOW!';
-  beep(880, 0.3, 'sine', 0.4);
-  vibrate(50);
-  startTime = Date.now();
-  ready = true;
+function updateProgress(n) {
+  [1,2,3].forEach(i => {
+    const dot = document.getElementById('dot' + i);
+    dot.className = 'prog-dot' + (i < n ? ' done' : i === n ? ' active' : '');
+  });
+  document.getElementById('testLabel').textContent = `Test ${n} of 3`;
 }
 
-function setBoxState(state) {
-  gameBox.className = state ? 'state-' + state : '';
+function nextTest() {
+  state.currentTest++;
+  if (state.currentTest > 3) { finishTests(); return; }
+  updateProgress(state.currentTest);
+  ['test1','test2','test3'].forEach((id,i) => {
+    document.getElementById(id).classList.toggle('hidden', i+1 !== state.currentTest);
+  });
+  if (state.currentTest === 2) setTimeout(startTest2, 100);
+  if (state.currentTest === 3) setTimeout(startTest3, 100);
 }
 
-/* === TAP HANDLER === */
-function handleTap() {
-  if (!inGame) return;
+/* ===== TEST 1: REACTION ===== */
+let r_ready = false, r_startTime, r_timeout, r_done = false;
 
-  if (!ready) {
-    clearTimeout(timeout);
-    clearInterval(countdownInterval);
-    countdown.classList.add('hidden');
-    inGame = false;
-    streak = 0;
-    localStorage.setItem('rsg_streak', 0);
-    updateStats();
-    setBoxState('soon');
-    message.textContent = 'Too soon! Tap START to retry.';
-    beep(220, 0.4, 'sawtooth', 0.3);
-    vibrate([80, 40, 80]);
-    showButtons(false);
+function startTest1() {
+  document.getElementById('test1').classList.remove('hidden');
+  document.getElementById('test2').classList.add('hidden');
+  document.getElementById('test3').classList.add('hidden');
+  r_done = false; r_ready = false;
+  const tgt = document.getElementById('reactionTarget');
+  tgt.className = 'reaction-target neutral';
+  document.getElementById('reactionMsg').textContent = 'TAP TO BEGIN';
+  document.getElementById('reactionHint').textContent = 'Tap the circle to start';
+}
+
+function reactionTap() {
+  if (r_done) return;
+  const tgt = document.getElementById('reactionTarget');
+  const hint = document.getElementById('reactionHint');
+
+  if (tgt.className.includes('neutral')) {
+    // Start: show waiting state
+    tgt.className = 'reaction-target waiting';
+    document.getElementById('reactionMsg').textContent = 'WAIT...';
+    hint.textContent = 'Wait for amber!';
+    const delay = 1500 + Math.random() * 2500;
+    r_timeout = setTimeout(() => {
+      tgt.className = 'reaction-target go';
+      document.getElementById('reactionMsg').textContent = 'TAP!';
+      r_startTime = Date.now();
+      r_ready = true;
+    }, delay);
     return;
   }
 
-  var reaction = Date.now() - startTime;
-  lastScore = reaction;
-  ready = false; inGame = false;
-  beep(660, 0.08, 'sine', 0.35);
-  setTimeout(function(){ beep(880, 0.15, 'sine', 0.25); }, 80);
-  vibrate(40);
-
-  streak++;
-  localStorage.setItem('rsg_streak', streak);
-  var newBest = false;
-  if (!best || reaction < best) {
-    best = reaction;
-    localStorage.setItem('rsg_best', best);
-    newBest = true;
+  if (tgt.className.includes('waiting')) {
+    // Tapped too early
+    clearTimeout(r_timeout);
+    tgt.className = 'reaction-target neutral';
+    document.getElementById('reactionMsg').textContent = 'TOO SOON!';
+    hint.textContent = 'Tap to try again';
+    state.scores.reaction = 20; // low score penalty
+    r_done = true;
+    setTimeout(nextTest, 1200);
+    return;
   }
-  updateStats();
-  setBoxState('');
-  message.textContent = '';
-  showResult(reaction, newBest);
-  buildLeaderboard(reaction);
-  shareSection.classList.remove('hidden');
-  showButtons(true);
-}
 
-function showResult(ms, newBest) {
-  resultPanel.classList.remove('hidden');
-  reactionTime.textContent = ms + ' ms';
-  var fb, color;
-  if (ms < 150)      { fb = 'Lightning Fast!';    color = '#ffd700'; }
-  else if (ms < 200) { fb = 'Great Reflex!';      color = '#00ff88'; }
-  else if (ms < 300) { fb = 'Average Reaction';   color = '#00e5ff'; }
-  else               { fb = 'Keep Practicing!';   color = '#ff4444'; }
-  feedbackMsg.textContent = fb;
-  feedbackMsg.style.color = color;
-  if (newBest && streak === 1) {
-    improvMsg.textContent = 'New personal best!';
-  } else if (newBest) {
-    improvMsg.textContent = 'New best! ' + streak + ' wins in a row!';
-  } else if (ms < best + 20) {
-    improvMsg.textContent = 'You got faster! Keep going!';
-  } else {
-    improvMsg.textContent = 'Try beating your best: ' + best + 'ms';
+  if (r_ready) {
+    const ms = Date.now() - r_startTime;
+    r_ready = false; r_done = true;
+    tgt.className = 'reaction-target done';
+    document.getElementById('reactionMsg').textContent = ms + 'ms';
+    hint.textContent = ms < 200 ? '⚡ Lightning fast!' : ms < 300 ? '👍 Nice!' : 'Keep practicing!';
+    // Score: <150ms=100, 150-200=90, 200-300=75, 300-400=55, 400+=35
+    state.scores.reaction = ms < 150 ? 100 : ms < 200 ? 90 : ms < 300 ? 75 : ms < 400 ? 55 : 35;
+    if (navigator.vibrate) navigator.vibrate(40);
+    setTimeout(nextTest, 1400);
   }
 }
 
-function updateStats() {
-  bestDisplay.textContent   = best ? best + 'ms' : '--';
-  streakDisplay.textContent = streak;
-}
+/* ===== TEST 2: MEMORY ===== */
+let mem_answer = '', mem_correct = '';
 
-function showButtons(hasScore) {
-  startBtn.classList.toggle('hidden', hasScore);
-  replayBtn.classList.toggle('hidden', !hasScore);
-}
+function startTest2() {
+  mem_answer = '';
+  const digits = 5; // show 5-digit sequence
+  mem_correct = Array.from({length: digits}, () => Math.floor(Math.random()*10)).join('');
 
-/* === SHARE === */
-function shareScore(platform) {
-  var score = lastScore || 0;
-  var text  = encodeURIComponent('I reacted in ' + score + 'ms on Reaction Speed Challenge! Can you beat me? \u26a1');
-  var url   = encodeURIComponent(window.location.href);
-  var links = {
-    facebook: 'https://www.facebook.com/sharer/sharer.php?u=' + url + '&quote=' + text,
-    twitter:  'https://twitter.com/intent/tweet?text=' + text + '&url=' + url,
-    whatsapp: 'https://api.whatsapp.com/send?text=' + text + '%20' + url
+  const disp = document.getElementById('memDisplay');
+  const desc = document.getElementById('memDesc');
+  const inp  = document.getElementById('memInput');
+
+  inp.classList.add('hidden');
+  disp.textContent = '';
+  desc.textContent = 'Memorize this sequence';
+
+  // Show digits one by one
+  let i = 0;
+  const show = () => {
+    if (i < mem_correct.length) {
+      disp.textContent = mem_correct.slice(0, i+1).split('').join(' ');
+      i++;
+      setTimeout(show, 600);
+    } else {
+      // Hide after viewing time
+      setTimeout(() => {
+        disp.textContent = '? ? ? ? ?';
+        desc.textContent = 'Now enter what you saw';
+        buildNumPad();
+        document.getElementById('numAnswer').textContent = '';
+        mem_answer = '';
+        inp.classList.remove('hidden');
+      }, 800);
+    }
   };
-  if (links[platform]) window.open(links[platform], '_blank', 'noopener');
+  setTimeout(show, 400);
 }
 
-init();
+function buildNumPad() {
+  const pad = document.getElementById('numPad');
+  const keys = [1,2,3,4,5,6,7,8,9,'⌫',0,''];
+  pad.innerHTML = keys.map(k => k === ''
+    ? `<div></div>`
+    : `<div class="num-key${k==='⌫'?' del':''}" onclick="numKey('${k}')">${k}</div>`
+  ).join('');
+}
+
+function numKey(k) {
+  if (k === '⌫') { mem_answer = mem_answer.slice(0,-1); }
+  else if (mem_answer.length < mem_correct.length) { mem_answer += k; }
+  document.getElementById('numAnswer').textContent = mem_answer.split('').join(' ') || ' ';
+  if (navigator.vibrate) navigator.vibrate(15);
+}
+
+function submitMemory() {
+  let correct = 0;
+  for (let i = 0; i < mem_correct.length; i++) {
+    if (mem_answer[i] === mem_correct[i]) correct++;
+  }
+  state.scores.memory = Math.round((correct / mem_correct.length) * 100);
+  nextTest();
+}
+
+/* ===== TEST 3: LOGIC ===== */
+const logicSets = [
+  { seq: [2,4,6,8,'?'],   answer: 10, opts: [9,10,11,12]  },
+  { seq: [1,3,9,27,'?'],  answer: 81, opts: [54,72,81,90]  },
+  { seq: [5,10,15,20,'?'],answer: 25, opts: [22,25,28,30]  },
+  { seq: [3,6,12,24,'?'], answer: 48, opts: [36,42,48,56]  },
+  { seq: [1,4,9,16,'?'],  answer: 25, opts: [20,23,25,28]  },
+  { seq: [100,50,25,'?'], answer: 12.5, opts: [10,12.5,15,20] },
+  { seq: [2,3,5,8,'?'],   answer: 13, opts: [11,12,13,14]  },
+  { seq: [7,14,21,28,'?'],answer: 35, opts: [33,35,37,42]  },
+];
+let logic_correct;
+
+function startTest3() {
+  const q = logicSets[Math.floor(Math.random() * logicSets.length)];
+  logic_correct = q.answer;
+
+  const seqEl  = document.getElementById('logicSeq');
+  const optsEl = document.getElementById('logicOpts');
+
+  seqEl.innerHTML = q.seq.map(v =>
+    `<div class="logic-item${v==='?'?' blank':''}">${v}</div>`
+  ).join('');
+
+  const shuffled = [...q.opts].sort(() => Math.random() - 0.5);
+  optsEl.innerHTML = shuffled.map(v =>
+    `<div class="logic-opt" onclick="logicPick(this, ${v})">${v}</div>`
+  ).join('');
+}
+
+function logicPick(el, val) {
+  if (state.scores.logic !== 0) return; // already answered
+
+  document.querySelectorAll('.logic-opt').forEach(o => {
+    o.style.pointerEvents = 'none';
+    if (parseFloat(o.textContent) === logic_correct) o.classList.add('correct');
+  });
+
+  const correct = (val === logic_correct);
+  el.classList.add(correct ? 'correct' : 'wrong');
+  state.scores.logic = correct ? 100 : 0;
+  if (navigator.vibrate) navigator.vibrate(correct ? 40 : [30,20,30]);
+  setTimeout(nextTest, 900);
+}
+
+/* ===== FINISH & SCORE ===== */
+function finishTests() {
+  const score = Math.round(
+    state.scores.reaction * 0.35 +
+    state.scores.memory   * 0.35 +
+    state.scores.logic    * 0.30
+  );
+
+  // Save to history
+  const history = getHistory();
+  const today   = getTodayDate();
+  const existing = history.findIndex(x => x.date === today);
+  const entry   = { date: today, score, breakdown: {...state.scores} };
+  if (existing > -1) history[existing] = entry; else history.push(entry);
+  Store.set('bp_history', history.slice(-30));
+
+  // Update best
+  const prev = getBest();
+  if (score > prev) Store.set('bp_best', score);
+
+  // Update streak
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+  const yStr = yesterday.toISOString().slice(0,10);
+  const hasYest = history.find(x => x.date === yStr);
+  Store.set('bp_streak', hasYest ? getStreak() + 1 : 1);
+
+  // Update total
+  Store.set('bp_total', getTotalTests() + 1);
+
+  showResult(score, prev);
+}
+
+/* ===== RESULT SCREEN ===== */
+function showResult(score, prevBest) {
+  showScreen('result');
+
+  // Animate score ring (circumference ≈ 327)
+  const circ = 327;
+  const arc = document.getElementById('scoreArc');
+  arc.style.strokeDasharray = '0 ' + circ;
+  const target = (score / 100) * circ;
+  let cur = 0;
+  const step = target / 40;
+  const anim = setInterval(() => {
+    cur = Math.min(cur + step, target);
+    arc.style.strokeDasharray = cur + ' ' + (circ - cur);
+    if (cur >= target) clearInterval(anim);
+  }, 20);
+
+  // Animate number
+  let n = 0;
+  const el = document.getElementById('finalScore');
+  const numAnim = setInterval(() => {
+    n = Math.min(n + Math.ceil(score / 30), score);
+    el.textContent = n;
+    if (n >= score) clearInterval(numAnim);
+  }, 30);
+
+  const gl = gradeLabel(score);
+  document.getElementById('resultGrade').textContent = gl.grade;
+  document.getElementById('resultMsg').textContent   = gl.msg;
+
+  // Breakdown
+  document.getElementById('bk-react').textContent  = state.scores.reaction + '/100';
+  document.getElementById('bk-mem').textContent    = state.scores.memory   + '/100';
+  document.getElementById('bk-logic').textContent  = state.scores.logic    + '/100';
+
+  // Compare
+  const compareEl = document.getElementById('resultCompare');
+  if (!prevBest || prevBest === 0) {
+    compareEl.textContent = '🎉 First score saved! Come back tomorrow to beat it.';
+  } else if (score > prevBest) {
+    compareEl.textContent = `🏆 New personal best! +${score - prevBest} pts vs your previous best of ${prevBest}`;
+  } else {
+    compareEl.textContent = `Try beating your best: ${prevBest}/100 — only ${prevBest - score} pts away!`;
+  }
+}
+
+function gradeLabel(score) {
+  if (score >= 90) return { grade: 'Genius 🧠',      msg: 'Exceptional cognitive performance today!' };
+  if (score >= 80) return { grade: 'Sharp Mind ⚡',   msg: 'Your brain is firing on all cylinders.' };
+  if (score >= 65) return { grade: 'Above Average 👍', msg: 'Solid performance. Push for a higher score!' };
+  if (score >= 50) return { grade: 'Average 🙂',       msg: 'Not bad! A bit more focus could boost your score.' };
+  return               { grade: 'Needs Work 💪',       msg: 'Come back tomorrow. Consistency builds sharpness!' };
+}
+
+/* ===== SHARE ===== */
+function shareTo(platform) {
+  const score = Store.get('bp_history')?.slice(-1)[0]?.score ?? '?';
+  const url   = encodeURIComponent(window.location.href);
+  const text  = encodeURIComponent(`I scored ${score}/100 on BrainPulse daily cognitive test! How sharp is YOUR brain? 🧠⚡`);
+  const urls  = {
+    facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}&quote=${text}`,
+    twitter:  `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
+    whatsapp: `https://wa.me/?text=${text}%20${url}`,
+  };
+  window.open(urls[platform], '_blank', 'noopener,noreferrer');
+}
+
+/* ===== INIT ===== */
+renderHome();
+showScreen('home');
