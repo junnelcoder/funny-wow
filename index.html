@@ -3,180 +3,295 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#0d1117">
-<meta name="description" content="Test your daily brain sharpness with a 60-second cognitive challenge. Track your mental score every day.">
-<title>BrainPulse — Daily Mental Sharpness Test</title>
+<meta name="theme-color" content="#0b0f1a">
+<meta name="description" content="StayClean — Turn discipline into dopamine. Track your clean days, earn XP, unlock badges. Break the habit for good.">
+<title>StayClean — Discipline Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=IBM+Plex+Mono:wght@400;600&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <!-- TOP BANNER AD -->
-<div class="ad-top">
-  <!-- PropellerAds Native Banner -->
-  <div id="propeller-banner-top"></div>
+<div class="ad-slot ad-top">
+  <div id="propeller-top"></div>
 </div>
 
 <div id="app">
 
-  <!-- ===== SCREEN: HOME ===== -->
-  <div id="screen-home" class="screen active">
-    <div class="home-bg-orb orb1"></div>
-    <div class="home-bg-orb orb2"></div>
-
-    <header class="home-header">
-      <div class="logo-mark">BP</div>
-      <h1 class="logo-text">BrainPulse</h1>
-      <p class="logo-sub">Daily Cognitive Test</p>
-    </header>
-
-    <div class="stats-strip">
-      <div class="strip-item">
-        <span class="strip-val" id="h-streak">0</span>
-        <span class="strip-label">Day Streak</span>
+  <!-- ======================================
+       SCREEN: ONBOARDING (first visit)
+  ======================================= -->
+  <div id="screen-onboard" class="screen">
+    <div class="ob-wrap">
+      <div class="ob-logo">
+        <div class="logo-icon">🛡️</div>
+        <h1 class="logo-wordmark">StayClean</h1>
+        <p class="logo-tagline">Replace the rush. Keep the wins.</p>
       </div>
-      <div class="strip-divider"></div>
-      <div class="strip-item">
-        <span class="strip-val" id="h-best">—</span>
-        <span class="strip-label">Best Score</span>
+
+      <div class="ob-card">
+        <p class="ob-headline">What are you quitting?</p>
+        <p class="ob-sub">Choose your challenge. You can add more later.</p>
+        <div class="habit-picker" id="habitPicker">
+          <button class="habit-pill" data-habit="gambling"   data-icon="🎰">Gambling</button>
+          <button class="habit-pill" data-habit="drinking"   data-icon="🍺">Drinking</button>
+          <button class="habit-pill" data-habit="smoking"    data-icon="🚬">Smoking</button>
+          <button class="habit-pill" data-habit="social"     data-icon="📱">Social Media</button>
+          <button class="habit-pill" data-habit="junkfood"   data-icon="🍔">Junk Food</button>
+          <button class="habit-pill" data-habit="spending"   data-icon="💸">Impulse Spending</button>
+        </div>
+        <p class="ob-or">— or type your own —</p>
+        <input type="text" id="customHabit" class="custom-input" placeholder="e.g. Online shopping, Vaping..." maxlength="30">
       </div>
-      <div class="strip-divider"></div>
-      <div class="strip-item">
-        <span class="strip-val" id="h-tests">0</span>
-        <span class="strip-label">Tests Done</span>
-      </div>
-    </div>
 
-    <div class="challenge-card">
-      <div class="challenge-badge">TODAY'S CHALLENGE</div>
-      <p class="challenge-desc">3 cognitive micro-tests · ~60 seconds<br>Reaction · Memory · Logic</p>
-      <div class="score-preview" id="todayPreview">
-        <span id="todayMsg">Ready to test your mind?</span>
-      </div>
-      <button class="btn-main" id="startTestBtn" onclick="initTest()">
-        <span class="btn-icon">⚡</span>
-        <span>Start Today's Test</span>
-      </button>
-      <p class="btn-note" id="dailyNote">Your score resets at midnight</p>
-    </div>
-
-    <div class="history-card" id="historyCard">
-      <h3 class="history-title">📈 Your Recent Scores</h3>
-      <div id="historyList"></div>
-    </div>
-
-    <div class="howto-card">
-      <h3 class="howto-title">How it works</h3>
-      <div class="howto-steps">
-        <div class="howto-step"><span class="step-num">1</span><span>Reaction speed test</span></div>
-        <div class="howto-step"><span class="step-num">2</span><span>Number memory test</span></div>
-        <div class="howto-step"><span class="step-num">3</span><span>Logic pattern test</span></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== SCREEN: AD GATE ===== -->
-  <div id="screen-adgate" class="screen">
-    <div class="gate-inner">
-      <div class="gate-spinner">
-        <svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="26" fill="none" stroke-width="4" stroke="var(--amber)" stroke-dasharray="100 64" stroke-linecap="round"/></svg>
-      </div>
-      <p class="gate-title">Preparing your test...</p>
-      <p class="gate-sub">Loading cognitive modules</p>
-      <div class="gate-bar"><div class="gate-fill" id="gateFill"></div></div>
-      <p class="gate-count" id="gateCount">5</p>
-    </div>
-  </div>
-
-  <!-- ===== SCREEN: TEST ===== -->
-  <div id="screen-test" class="screen">
-    <div class="test-header">
-      <div class="test-progress">
-        <div class="prog-dot" id="dot1"></div>
-        <div class="prog-line"></div>
-        <div class="prog-dot" id="dot2"></div>
-        <div class="prog-line"></div>
-        <div class="prog-dot" id="dot3"></div>
-      </div>
-      <div class="test-label" id="testLabel">Test 1 of 3</div>
-    </div>
-
-    <!-- Test 1: Reaction -->
-    <div id="test1" class="test-panel">
-      <h2 class="test-title">Reaction Speed</h2>
-      <p class="test-desc">Tap the circle the instant it turns <strong>amber</strong></p>
-      <div id="reactionTarget" class="reaction-target neutral" onclick="reactionTap()">
-        <span id="reactionMsg">TAP TO BEGIN</span>
-      </div>
-      <p class="test-hint" id="reactionHint">Tap the circle to start</p>
-    </div>
-
-    <!-- Test 2: Memory -->
-    <div id="test2" class="test-panel hidden">
-      <h2 class="test-title">Number Memory</h2>
-      <p class="test-desc" id="memDesc">Memorize this sequence</p>
-      <div class="memory-display" id="memDisplay"></div>
-      <div class="memory-input hidden" id="memInput">
-        <p class="mem-prompt">Type the numbers you saw:</p>
-        <div class="num-pad" id="numPad"></div>
-        <div class="num-answer" id="numAnswer"></div>
-        <button class="btn-submit" onclick="submitMemory()">Submit ✓</button>
-      </div>
-    </div>
-
-    <!-- Test 3: Logic -->
-    <div id="test3" class="test-panel hidden">
-      <h2 class="test-title">Logic Pattern</h2>
-      <p class="test-desc">What comes next in the sequence?</p>
-      <div class="logic-sequence" id="logicSeq"></div>
-      <div class="logic-options" id="logicOpts"></div>
-    </div>
-  </div>
-
-  <!-- ===== SCREEN: RESULT ===== -->
-  <div id="screen-result" class="screen">
-    <div class="result-bg-ring"></div>
-    <div class="result-inner">
-      <p class="result-label">YOUR BRAIN SCORE</p>
-      <div class="result-score-wrap">
-        <svg class="score-ring" viewBox="0 0 120 120">
-          <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="8"/>
-          <circle id="scoreArc" cx="60" cy="60" r="52" fill="none" stroke="var(--amber)" stroke-width="8"
-            stroke-linecap="round" stroke-dasharray="0 327" transform="rotate(-90 60 60)"/>
-        </svg>
-        <div class="score-center">
-          <span class="score-num" id="finalScore">0</span>
-          <span class="score-unit">/100</span>
+      <div class="ob-card">
+        <p class="ob-headline">Set your daily goal 💰</p>
+        <p class="ob-sub">How much money do you save each clean day?</p>
+        <div class="saving-row">
+          <span class="saving-currency">$</span>
+          <input type="number" id="dailySaving" class="saving-input" value="20" min="0" max="9999">
+          <span class="saving-label">/ day saved</span>
         </div>
       </div>
-      <p class="result-grade" id="resultGrade">—</p>
-      <p class="result-msg" id="resultMsg">—</p>
 
-      <div class="result-breakdown">
-        <div class="bk-item"><span class="bk-label">⚡ Reaction</span><span class="bk-val" id="bk-react">—</span></div>
-        <div class="bk-item"><span class="bk-label">🧠 Memory</span><span class="bk-val" id="bk-mem">—</span></div>
-        <div class="bk-item"><span class="bk-label">🔢 Logic</span><span class="bk-val" id="bk-logic">—</span></div>
+      <button class="btn-main" onclick="startJourney()">
+        <span>Begin My Journey</span>
+        <span class="btn-arrow">→</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ======================================
+       SCREEN: HOME / DASHBOARD
+  ======================================= -->
+  <div id="screen-home" class="screen">
+
+    <!-- Header -->
+    <header class="dash-header">
+      <div class="dash-identity">
+        <div class="habit-badge" id="dashHabitIcon">🛡️</div>
+        <div>
+          <p class="dash-greeting" id="dashGreeting">Good morning</p>
+          <p class="dash-habit" id="dashHabitName">Loading...</p>
+        </div>
+      </div>
+      <button class="settings-btn" onclick="showScreen('screen-settings')">⚙</button>
+    </header>
+
+    <!-- Hero: Days Counter -->
+    <div class="hero-card" id="heroCard">
+      <div class="hero-ring-wrap">
+        <svg class="hero-ring" viewBox="0 0 140 140">
+          <circle cx="70" cy="70" r="60" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
+          <circle id="heroArc" cx="70" cy="70" r="60" fill="none" stroke="url(#heroGrad)" stroke-width="8"
+            stroke-linecap="round" stroke-dasharray="0 377" transform="rotate(-90 70 70)"/>
+          <defs>
+            <linearGradient id="heroGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="var(--green)"/>
+              <stop offset="100%" stop-color="var(--teal)"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div class="hero-center">
+          <span class="hero-days" id="heroDays">0</span>
+          <span class="hero-days-label">days</span>
+        </div>
+      </div>
+      <div class="hero-text">
+        <p class="hero-title" id="heroTitle">Day 0 — Just Starting</p>
+        <p class="hero-sub" id="heroSub">Check in today to begin your streak</p>
+      </div>
+      <div class="hero-savings">
+        <span class="savings-label">Total saved</span>
+        <span class="savings-val" id="heroSavings">$0</span>
+      </div>
+    </div>
+
+    <!-- Daily Check-in button (ad-gated) -->
+    <button class="btn-checkin" id="checkinBtn" onclick="triggerCheckin()">
+      <span class="checkin-icon">✓</span>
+      <span class="checkin-text" id="checkinText">Check In Today</span>
+    </button>
+    <p class="checkin-note" id="checkinNote">Tap to claim today's XP reward</p>
+
+    <!-- XP / Level Bar -->
+    <div class="xp-card">
+      <div class="xp-row">
+        <span class="xp-level" id="xpLevel">Lv 1</span>
+        <span class="xp-title" id="xpTitle">Beginner</span>
+        <span class="xp-pts" id="xpPts">0 XP</span>
+      </div>
+      <div class="xp-bar-track">
+        <div class="xp-bar-fill" id="xpFill" style="width:0%"></div>
+      </div>
+      <p class="xp-next" id="xpNext">50 XP to next level</p>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-row">
+      <div class="stat-box">
+        <span class="stat-icon">🔥</span>
+        <span class="stat-num" id="statStreak">0</span>
+        <span class="stat-lbl">Streak</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-icon">⭐</span>
+        <span class="stat-num" id="statXP">0</span>
+        <span class="stat-lbl">Total XP</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-icon">🏅</span>
+        <span class="stat-num" id="statBadges">0</span>
+        <span class="stat-lbl">Badges</span>
+      </div>
+    </div>
+
+    <!-- Motivation Quote -->
+    <div class="quote-card" id="quoteCard">
+      <p class="quote-text" id="quoteText">"Every day clean is a victory."</p>
+    </div>
+
+    <!-- Badges Preview -->
+    <div class="section-card">
+      <div class="section-hdr">
+        <span class="section-title">🏅 Your Badges</span>
+        <button class="section-more" onclick="showScreen('screen-badges')">See all →</button>
+      </div>
+      <div class="badge-grid" id="badgeGridHome"></div>
+    </div>
+
+    <!-- Recent Activity Log -->
+    <div class="section-card">
+      <div class="section-hdr">
+        <span class="section-title">📅 Recent Check-ins</span>
+      </div>
+      <div id="activityLog"></div>
+    </div>
+
+    <!-- Share -->
+    <div class="share-card">
+      <p class="share-title">Inspire someone today 💬</p>
+      <div class="share-row">
+        <button class="share-btn fb" onclick="shareTo('facebook')">Facebook</button>
+        <button class="share-btn wa" onclick="shareTo('whatsapp')">WhatsApp</button>
+        <button class="share-btn tw" onclick="shareTo('twitter')">Twitter / X</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ======================================
+       SCREEN: AD GATE (check-in loading)
+  ======================================= -->
+  <div id="screen-adgate" class="screen">
+    <div class="gate-wrap">
+      <div class="gate-pulse">
+        <div class="gate-ring r1"></div>
+        <div class="gate-ring r2"></div>
+        <div class="gate-icon" id="gateIcon">✓</div>
+      </div>
+      <h2 class="gate-title" id="gateTitle">Logging your clean day...</h2>
+      <p class="gate-sub" id="gateSub">Processing your reward</p>
+      <div class="gate-progress">
+        <div class="gate-bar-fill" id="gateBarFill"></div>
+      </div>
+      <p class="gate-timer" id="gateTimer">5</p>
+      <p class="gate-note">Your XP and streak are being calculated</p>
+    </div>
+  </div>
+
+  <!-- ======================================
+       SCREEN: REWARD (post check-in)
+  ======================================= -->
+  <div id="screen-reward" class="screen">
+    <div class="reward-wrap">
+      <div class="reward-burst" id="rewardBurst">🎉</div>
+      <h2 class="reward-title" id="rewardTitle">Day Logged!</h2>
+      <p class="reward-streak" id="rewardStreak">🔥 1 Day Streak</p>
+
+      <div class="reward-xp-box">
+        <p class="rxp-label">XP EARNED TODAY</p>
+        <p class="rxp-val" id="rewardXP">+50 XP</p>
+        <p class="rxp-bonus" id="rewardBonus"></p>
       </div>
 
-      <div class="result-compare" id="resultCompare"></div>
-
-      <div class="result-actions">
-        <button class="btn-share fb" onclick="shareTo('facebook')">Share on Facebook</button>
-        <button class="btn-share wa" onclick="shareTo('whatsapp')">Share on WhatsApp</button>
-        <button class="btn-share tw" onclick="shareTo('twitter')">Share on X</button>
+      <div class="reward-savings-box">
+        <p class="rsav-label">💰 Money Saved Today</p>
+        <p class="rsav-val" id="rewardSavings">$20</p>
+        <p class="rsav-total" id="rewardTotal">Total: $0 saved</p>
       </div>
 
-      <button class="btn-home" onclick="goHome()">← Back to Home</button>
-      <p class="result-return">Come back tomorrow to beat your score 🔥</p>
+      <div class="reward-badge-reveal" id="badgeReveal" style="display:none">
+        <p class="badge-reveal-label">🏅 NEW BADGE UNLOCKED!</p>
+        <div class="badge-reveal-icon" id="badgeRevealIcon"></div>
+        <p class="badge-reveal-name" id="badgeRevealName"></p>
+      </div>
+
+      <div class="reward-msg-card">
+        <p id="rewardMsg">Keep going. You're building something real.</p>
+      </div>
+
+      <button class="btn-main" onclick="goHome()">Back to Dashboard</button>
+    </div>
+  </div>
+
+  <!-- ======================================
+       SCREEN: BADGES
+  ======================================= -->
+  <div id="screen-badges" class="screen">
+    <div class="inner-screen">
+      <div class="inner-header">
+        <button class="back-btn" onclick="goHome()">← Back</button>
+        <h2 class="inner-title">Your Badges</h2>
+      </div>
+      <p class="inner-sub">Earn badges by staying clean and checking in daily</p>
+      <div class="badge-full-grid" id="badgeFullGrid"></div>
+    </div>
+  </div>
+
+  <!-- ======================================
+       SCREEN: SETTINGS / RESET
+  ======================================= -->
+  <div id="screen-settings" class="screen">
+    <div class="inner-screen">
+      <div class="inner-header">
+        <button class="back-btn" onclick="goHome()">← Back</button>
+        <h2 class="inner-title">Settings</h2>
+      </div>
+
+      <div class="settings-card">
+        <p class="set-label">Current Challenge</p>
+        <p class="set-val" id="setHabit">—</p>
+      </div>
+
+      <div class="settings-card">
+        <p class="set-label">Daily Savings Goal</p>
+        <div class="saving-row">
+          <span class="saving-currency">$</span>
+          <input type="number" id="setSavingInput" class="saving-input" value="20" min="0" max="9999">
+          <button class="btn-small" onclick="updateSavings()">Save</button>
+        </div>
+      </div>
+
+      <div class="settings-card danger-zone">
+        <p class="set-label">Relapse? Reset your streak</p>
+        <p class="set-note">This resets your streak to 0 but keeps your XP and badges. You've already come this far — you can start again.</p>
+        <button class="btn-danger" onclick="confirmRelapse()">I Relapsed — Reset Streak</button>
+      </div>
+
+      <div class="settings-card danger-zone">
+        <p class="set-label">Change habit / full reset</p>
+        <button class="btn-danger" onclick="confirmReset()">Start Over Completely</button>
+      </div>
     </div>
   </div>
 
 </div><!-- end #app -->
 
 <!-- BOTTOM BANNER AD -->
-<div class="ad-bottom">
-  <div id="propeller-banner-bottom"></div>
+<div class="ad-slot ad-bottom">
+  <div id="propeller-bottom"></div>
 </div>
 
 <script src="script.js"></script>
