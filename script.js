@@ -1,405 +1,471 @@
 /* ==============================================
-   BrainPulse — script.js
-   Tool: Daily Cognitive Brain Score Tracker
-   Tests: Reaction Speed · Number Memory · Logic
+   StayClean — script.js
+   Reward-Based Discipline / No-Habit Tracker
+   Mechanics: XP · Levels · Badges · Streaks · Savings
 ============================================== */
 
-/* ===== STATE ===== */
-const state = {
-  screen: 'home',
-  currentTest: 0,
-  scores: { reaction: 0, memory: 0, logic: 0 },
-  testInProgress: false,
+/* ===================================================
+   CONFIGURATION
+=================================================== */
+const LEVELS = [
+  { xp: 0,    title: 'Beginner',       color: '#6b7594' },
+  { xp: 50,   title: 'Determined',     color: '#4f8ef7' },
+  { xp: 150,  title: 'Disciplined',    color: '#22d47a' },
+  { xp: 300,  title: 'Strong Mind',    color: '#00c9b1' },
+  { xp: 500,  title: 'Iron Will',      color: '#9b6dff' },
+  { xp: 800,  title: 'Unbreakable',    color: '#f5c842' },
+  { xp: 1200, title: 'Legend',         color: '#ff9f43' },
+  { xp: 2000, title: 'Master',         color: '#ff5f5f' },
+];
+
+const BADGES = [
+  { id: 'day1',    emoji: '🌱', name: '1 Day',       req: 'Log your first day',          check: (d,s) => d >= 1 },
+  { id: 'day3',    emoji: '💪', name: '3 Days',       req: '3-day streak',                check: (d,s) => s >= 3 },
+  { id: 'day7',    emoji: '🔥', name: '1 Week',       req: '7-day streak',                check: (d,s) => s >= 7 },
+  { id: 'day14',   emoji: '⚡', name: '2 Weeks',      req: '14-day streak',               check: (d,s) => s >= 14 },
+  { id: 'day30',   emoji: '🏆', name: '1 Month',      req: '30-day streak',               check: (d,s) => s >= 30 },
+  { id: 'day60',   emoji: '💎', name: '2 Months',     req: '60-day streak',               check: (d,s) => s >= 60 },
+  { id: 'day100',  emoji: '🌟', name: '100 Days',     req: '100-day streak',              check: (d,s) => s >= 100 },
+  { id: 'day365',  emoji: '👑', name: '1 Year',       req: '365-day streak',              check: (d,s) => s >= 365 },
+  { id: 'save100', emoji: '💰', name: '$100 Saved',   req: 'Save $100 total',             check: (d,s,sv) => sv >= 100 },
+  { id: 'save500', emoji: '💵', name: '$500 Saved',   req: 'Save $500 total',             check: (d,s,sv) => sv >= 500 },
+  { id: 'save1k',  emoji: '🤑', name: '$1K Saved',    req: 'Save $1,000 total',           check: (d,s,sv) => sv >= 1000 },
+];
+
+const QUOTES = [
+  '"Every day clean is a victory." — You',
+  '"The strongest people are not those who never break, but those who rebuild."',
+  '"Discipline is choosing between what you want now and what you want most."',
+  '"You don\'t have to be perfect, just consistent."',
+  '"Each morning you wake up clean is a win. Stack the wins."',
+  '"The cravings will pass. Your progress is permanent."',
+  '"Progress, not perfection."',
+  '"You\'ve survived every urge so far. That\'s 100%."',
+  '"What you resist, you grow stronger than."',
+  '"Today\'s discipline is tomorrow\'s freedom."',
+];
+
+const REWARD_MSGS = [
+  'Keep going. You\'re building something real.',
+  'Another clean day. That\'s real strength.',
+  'Every check-in is a vote for the person you\'re becoming.',
+  'You chose yourself today. That matters.',
+  'The streak continues. Don\'t stop now.',
+  'Feeling the urge? Look at your streak. Was it worth breaking?',
+  'You\'re further along than yesterday. That\'s all that counts.',
+];
+
+const HABIT_ICONS = {
+  gambling: '🎰', drinking: '🍺', smoking: '🚬',
+  social: '📱', junkfood: '🍔', spending: '💸', custom: '🛡️'
 };
 
-/* ===== STORAGE HELPERS ===== */
-const Store = {
-  get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
-  set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
+/* ===================================================
+   STORAGE
+=================================================== */
+const S = {
+  get: k => { try { return JSON.parse(localStorage.getItem('sc_' + k)); } catch { return null; } },
+  set: (k, v) => localStorage.setItem('sc_' + k, JSON.stringify(v)),
 };
 
-function getHistory()   { return Store.get('bp_history')  || []; }
-function getBest()      { return Store.get('bp_best')      || 0;  }
-function getStreak()    { return Store.get('bp_streak')    || 0;  }
-function getTotalTests(){ return Store.get('bp_total')     || 0;  }
-function getTodayDate() { return new Date().toISOString().slice(0,10); }
-function getTodayScore(){ const h = getHistory(); return h.find(x => x.date === getTodayDate()) || null; }
+function getData() {
+  return S.get('data') || {
+    habit: null, habitIcon: '🛡️', habitLabel: 'My Habit',
+    dailySaving: 20,
+    streak: 0, longestStreak: 0, totalDays: 0,
+    totalXP: 0, totalSaved: 0,
+    checkIns: [],       // array of date strings "YYYY-MM-DD"
+    badges: [],         // array of badge ids earned
+    lastCheckin: null,
+  };
+}
+function saveData(d) { S.set('data', d); }
+function today() { return new Date().toISOString().slice(0, 10); }
+function formatDate(str) {
+  const d = new Date(str + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
-/* ===== SCREEN ROUTER ===== */
+/* ===================================================
+   SCREEN ROUTING
+=================================================== */
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('screen-' + id).classList.add('active');
-  state.screen = id;
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0, 0);
 }
 
-/* ===== HOME SCREEN ===== */
-function goHome() { renderHome(); showScreen('home'); }
+/* ===================================================
+   ONBOARDING
+=================================================== */
+let selectedHabit = null;
 
-function renderHome() {
-  document.getElementById('h-streak').textContent = getStreak();
-  document.getElementById('h-best').textContent   = getBest() ? getBest() : '—';
-  document.getElementById('h-tests').textContent  = getTotalTests();
+document.querySelectorAll('.habit-pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.habit-pill').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedHabit = { id: btn.dataset.habit, icon: btn.dataset.icon, label: btn.textContent.trim() };
+    document.getElementById('customHabit').value = '';
+  });
+});
 
-  const today = getTodayScore();
-  const btn   = document.getElementById('startTestBtn');
-  const note  = document.getElementById('dailyNote');
-  const prev  = document.getElementById('todayPreview');
-  const msg   = document.getElementById('todayMsg');
-
-  if (today) {
-    msg.textContent = `Today's score: ${today.score}/100 — ${gradeLabel(today.score).grade}`;
-    btn.classList.add('disabled');
-    btn.innerHTML = '<span class="btn-icon">✓</span><span>Test Complete for Today</span>';
-    note.textContent = 'Come back tomorrow for a new challenge!';
-    prev.style.borderStyle = 'solid';
+function startJourney() {
+  const custom = document.getElementById('customHabit').value.trim();
+  let habit;
+  if (custom) {
+    habit = { id: 'custom', icon: '🛡️', label: custom };
+  } else if (selectedHabit) {
+    habit = selectedHabit;
   } else {
-    msg.textContent = 'Ready to test your mind?';
-    btn.classList.remove('disabled');
-    btn.innerHTML = '<span class="btn-icon">⚡</span><span>Start Today\'s Test</span>';
-    note.textContent = 'Your score resets at midnight';
-    prev.style.borderStyle = 'dashed';
+    alert('Please select or type a habit to quit.');
+    return;
   }
 
-  renderHistory();
+  const saving = parseFloat(document.getElementById('dailySaving').value) || 20;
+  const d = getData();
+  d.habit = habit.id;
+  d.habitIcon = habit.icon;
+  d.habitLabel = habit.label;
+  d.dailySaving = saving;
+  saveData(d);
+
+  renderHome();
+  showScreen('screen-home');
 }
 
-function renderHistory() {
-  const list = getHistory().slice(-7).reverse();
-  const el   = document.getElementById('historyList');
-  if (!list.length) { el.innerHTML = '<p style="font-size:13px;color:var(--muted);text-align:center">No scores yet. Take your first test!</p>'; return; }
-  el.innerHTML = list.map(e => `
-    <div class="hist-row">
-      <span class="hist-date">${e.date.slice(5)}</span>
-      <div class="hist-bar-wrap"><div class="hist-bar" style="width:${e.score}%"></div></div>
-      <span class="hist-score">${e.score}</span>
+/* ===================================================
+   HOME / DASHBOARD
+=================================================== */
+function goHome() { renderHome(); showScreen('screen-home'); }
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function getLevelInfo(xp) {
+  let lv = 0;
+  for (let i = LEVELS.length - 1; i >= 0; i--) {
+    if (xp >= LEVELS[i].xp) { lv = i; break; }
+  }
+  const next = LEVELS[lv + 1];
+  const pct  = next
+    ? Math.round(((xp - LEVELS[lv].xp) / (next.xp - LEVELS[lv].xp)) * 100)
+    : 100;
+  return { level: lv + 1, title: LEVELS[lv].title, nextXP: next ? next.xp : null, pct };
+}
+
+function renderHome() {
+  const d = getData();
+  if (!d.habit) { showScreen('screen-onboard'); return; }
+
+  // Header
+  document.getElementById('dashGreeting').textContent  = getGreeting();
+  document.getElementById('dashHabitName').textContent = 'No ' + d.habitLabel;
+  document.getElementById('dashHabitIcon').textContent = d.habitIcon;
+
+  // Hero ring (progress toward 365 days)
+  const circ = 377;
+  const pct  = Math.min(d.streak / 365, 1);
+  const arc  = document.getElementById('heroArc');
+  setTimeout(() => {
+    arc.style.strokeDasharray = (pct * circ) + ' ' + ((1 - pct) * circ);
+  }, 100);
+  document.getElementById('heroDays').textContent = d.streak;
+  document.getElementById('heroTitle').textContent = heroTitle(d.streak);
+  document.getElementById('heroSub').textContent   = heroSub(d);
+  document.getElementById('heroSavings').textContent = '$' + d.totalSaved.toFixed(0);
+
+  // Check-in button
+  const alreadyToday = d.lastCheckin === today();
+  const btn  = document.getElementById('checkinBtn');
+  const note = document.getElementById('checkinNote');
+  const ctxt = document.getElementById('checkinText');
+  if (alreadyToday) {
+    btn.classList.add('done');
+    ctxt.textContent = '✓ Checked In Today';
+    note.textContent = 'Come back tomorrow to keep your streak!';
+  } else {
+    btn.classList.remove('done');
+    ctxt.textContent = 'Check In Today';
+    note.textContent = 'Tap to log your clean day & earn XP';
+  }
+
+  // XP bar
+  const lv = getLevelInfo(d.totalXP);
+  document.getElementById('xpLevel').textContent = 'Lv ' + lv.level;
+  document.getElementById('xpTitle').textContent = lv.title;
+  document.getElementById('xpPts').textContent   = d.totalXP + ' XP';
+  document.getElementById('xpFill').style.width  = lv.pct + '%';
+  document.getElementById('xpNext').textContent  = lv.nextXP
+    ? (lv.nextXP - d.totalXP) + ' XP to next level'
+    : 'MAX LEVEL';
+
+  // Stats
+  document.getElementById('statStreak').textContent = d.streak;
+  document.getElementById('statXP').textContent     = d.totalXP;
+  document.getElementById('statBadges').textContent = d.badges.length;
+
+  // Quote
+  document.getElementById('quoteText').textContent =
+    QUOTES[Math.floor(Math.random() * QUOTES.length)];
+
+  // Badges preview (first 4)
+  renderBadgeGrid('badgeGridHome', d, 4);
+
+  // Activity log
+  renderActivityLog(d);
+}
+
+function heroTitle(streak) {
+  if (streak === 0) return 'Day 0 — Just Starting';
+  if (streak === 1) return 'Day 1 — The hardest step ✓';
+  if (streak < 7)  return `Day ${streak} — Building Momentum`;
+  if (streak < 30) return `Day ${streak} — Feeling Stronger`;
+  if (streak < 100) return `Day ${streak} — Iron Discipline`;
+  return `Day ${streak} — LEGENDARY 👑`;
+}
+
+function heroSub(d) {
+  if (d.lastCheckin !== today()) return 'Check in today to keep your streak!';
+  if (d.streak === 1) return 'First clean day logged. Keep going!';
+  return `${d.streak}-day streak active 🔥`;
+}
+
+function renderBadgeGrid(elId, d, limit) {
+  const el = document.getElementById(elId);
+  const list = limit ? BADGES.slice(0, limit) : BADGES;
+  el.innerHTML = list.map(b => {
+    const unlocked = d.badges.includes(b.id);
+    return `<div class="badge-item ${unlocked ? 'unlocked' : 'locked'}">
+      <span class="badge-emoji">${b.emoji}</span>
+      <span class="badge-name">${b.name}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderActivityLog(d) {
+  const el = document.getElementById('activityLog');
+  const recent = d.checkIns.slice(-7).reverse();
+  if (!recent.length) {
+    el.innerHTML = '<p style="font-size:13px;color:var(--muted);padding:8px 0">No check-ins yet. Start today!</p>';
+    return;
+  }
+  el.innerHTML = recent.map((date, i) => `
+    <div class="log-row">
+      <span class="log-dot"></span>
+      <span class="log-date">${formatDate(date)}</span>
+      <span class="log-xp">+${xpForDay(d.checkIns.length - i)} XP</span>
+      <span class="log-streak">🔥 ${d.checkIns.length - i}d</span>
     </div>`).join('');
 }
 
-/* ===== AD GATE ===== */
-function initTest() {
-  if (getTodayScore()) return;
-  showScreen('adgate');
+function xpForDay(dayNum) {
+  // Base 50 + streak bonuses
+  let xp = 50;
+  if (dayNum >= 7)  xp += 25;
+  if (dayNum >= 14) xp += 25;
+  if (dayNum >= 30) xp += 50;
+  return xp;
+}
+
+/* ===================================================
+   AD GATE → CHECK-IN FLOW
+=================================================== */
+function triggerCheckin() {
+  const d = getData();
+  if (d.lastCheckin === today()) return;
+  showScreen('screen-adgate');
 
   let secs = 5;
-  const countEl = document.getElementById('gateCount');
-  const fillEl  = document.getElementById('gateFill');
-  countEl.textContent = secs;
-  fillEl.style.width  = '0%';
+  const timerEl = document.getElementById('gateTimer');
+  const fillEl  = document.getElementById('gateBarFill');
+  timerEl.textContent = secs;
 
-  // Animate bar
   let pct = 0;
-  const barInterval = setInterval(() => {
+  const fillTick = setInterval(() => {
     pct += 100 / (secs * 20);
     fillEl.style.width = Math.min(pct, 100) + '%';
   }, 50);
 
-  // Countdown
-  const tick = setInterval(() => {
+  const countTick = setInterval(() => {
     secs--;
-    countEl.textContent = secs;
+    timerEl.textContent = secs;
     if (secs <= 0) {
-      clearInterval(tick);
-      clearInterval(barInterval);
+      clearInterval(countTick);
+      clearInterval(fillTick);
       fillEl.style.width = '100%';
-      setTimeout(startTests, 300);
+      setTimeout(processCheckin, 350);
     }
   }, 1000);
 }
 
-/* ===== TEST FLOW ===== */
-function startTests() {
-  state.currentTest = 1;
-  state.scores = { reaction: 0, memory: 0, logic: 0 };
-  updateProgress(1);
-  showScreen('test');
-  setTimeout(startTest1, 100);
-}
-
-function updateProgress(n) {
-  [1,2,3].forEach(i => {
-    const dot = document.getElementById('dot' + i);
-    dot.className = 'prog-dot' + (i < n ? ' done' : i === n ? ' active' : '');
-  });
-  document.getElementById('testLabel').textContent = `Test ${n} of 3`;
-}
-
-function nextTest() {
-  state.currentTest++;
-  if (state.currentTest > 3) { finishTests(); return; }
-  updateProgress(state.currentTest);
-  ['test1','test2','test3'].forEach((id,i) => {
-    document.getElementById(id).classList.toggle('hidden', i+1 !== state.currentTest);
-  });
-  if (state.currentTest === 2) setTimeout(startTest2, 100);
-  if (state.currentTest === 3) setTimeout(startTest3, 100);
-}
-
-/* ===== TEST 1: REACTION ===== */
-let r_ready = false, r_startTime, r_timeout, r_done = false;
-
-function startTest1() {
-  document.getElementById('test1').classList.remove('hidden');
-  document.getElementById('test2').classList.add('hidden');
-  document.getElementById('test3').classList.add('hidden');
-  r_done = false; r_ready = false;
-  const tgt = document.getElementById('reactionTarget');
-  tgt.className = 'reaction-target neutral';
-  document.getElementById('reactionMsg').textContent = 'TAP TO BEGIN';
-  document.getElementById('reactionHint').textContent = 'Tap the circle to start';
-}
-
-function reactionTap() {
-  if (r_done) return;
-  const tgt = document.getElementById('reactionTarget');
-  const hint = document.getElementById('reactionHint');
-
-  if (tgt.className.includes('neutral')) {
-    // Start: show waiting state
-    tgt.className = 'reaction-target waiting';
-    document.getElementById('reactionMsg').textContent = 'WAIT...';
-    hint.textContent = 'Wait for amber!';
-    const delay = 1500 + Math.random() * 2500;
-    r_timeout = setTimeout(() => {
-      tgt.className = 'reaction-target go';
-      document.getElementById('reactionMsg').textContent = 'TAP!';
-      r_startTime = Date.now();
-      r_ready = true;
-    }, delay);
-    return;
-  }
-
-  if (tgt.className.includes('waiting')) {
-    // Tapped too early
-    clearTimeout(r_timeout);
-    tgt.className = 'reaction-target neutral';
-    document.getElementById('reactionMsg').textContent = 'TOO SOON!';
-    hint.textContent = 'Tap to try again';
-    state.scores.reaction = 20; // low score penalty
-    r_done = true;
-    setTimeout(nextTest, 1200);
-    return;
-  }
-
-  if (r_ready) {
-    const ms = Date.now() - r_startTime;
-    r_ready = false; r_done = true;
-    tgt.className = 'reaction-target done';
-    document.getElementById('reactionMsg').textContent = ms + 'ms';
-    hint.textContent = ms < 200 ? '⚡ Lightning fast!' : ms < 300 ? '👍 Nice!' : 'Keep practicing!';
-    // Score: <150ms=100, 150-200=90, 200-300=75, 300-400=55, 400+=35
-    state.scores.reaction = ms < 150 ? 100 : ms < 200 ? 90 : ms < 300 ? 75 : ms < 400 ? 55 : 35;
-    if (navigator.vibrate) navigator.vibrate(40);
-    setTimeout(nextTest, 1400);
-  }
-}
-
-/* ===== TEST 2: MEMORY ===== */
-let mem_answer = '', mem_correct = '';
-
-function startTest2() {
-  mem_answer = '';
-  const digits = 5; // show 5-digit sequence
-  mem_correct = Array.from({length: digits}, () => Math.floor(Math.random()*10)).join('');
-
-  const disp = document.getElementById('memDisplay');
-  const desc = document.getElementById('memDesc');
-  const inp  = document.getElementById('memInput');
-
-  inp.classList.add('hidden');
-  disp.textContent = '';
-  desc.textContent = 'Memorize this sequence';
-
-  // Show digits one by one
-  let i = 0;
-  const show = () => {
-    if (i < mem_correct.length) {
-      disp.textContent = mem_correct.slice(0, i+1).split('').join(' ');
-      i++;
-      setTimeout(show, 600);
-    } else {
-      // Hide after viewing time
-      setTimeout(() => {
-        disp.textContent = '? ? ? ? ?';
-        desc.textContent = 'Now enter what you saw';
-        buildNumPad();
-        document.getElementById('numAnswer').textContent = '';
-        mem_answer = '';
-        inp.classList.remove('hidden');
-      }, 800);
-    }
-  };
-  setTimeout(show, 400);
-}
-
-function buildNumPad() {
-  const pad = document.getElementById('numPad');
-  const keys = [1,2,3,4,5,6,7,8,9,'⌫',0,''];
-  pad.innerHTML = keys.map(k => k === ''
-    ? `<div></div>`
-    : `<div class="num-key${k==='⌫'?' del':''}" onclick="numKey('${k}')">${k}</div>`
-  ).join('');
-}
-
-function numKey(k) {
-  if (k === '⌫') { mem_answer = mem_answer.slice(0,-1); }
-  else if (mem_answer.length < mem_correct.length) { mem_answer += k; }
-  document.getElementById('numAnswer').textContent = mem_answer.split('').join(' ') || ' ';
-  if (navigator.vibrate) navigator.vibrate(15);
-}
-
-function submitMemory() {
-  let correct = 0;
-  for (let i = 0; i < mem_correct.length; i++) {
-    if (mem_answer[i] === mem_correct[i]) correct++;
-  }
-  state.scores.memory = Math.round((correct / mem_correct.length) * 100);
-  nextTest();
-}
-
-/* ===== TEST 3: LOGIC ===== */
-const logicSets = [
-  { seq: [2,4,6,8,'?'],   answer: 10, opts: [9,10,11,12]  },
-  { seq: [1,3,9,27,'?'],  answer: 81, opts: [54,72,81,90]  },
-  { seq: [5,10,15,20,'?'],answer: 25, opts: [22,25,28,30]  },
-  { seq: [3,6,12,24,'?'], answer: 48, opts: [36,42,48,56]  },
-  { seq: [1,4,9,16,'?'],  answer: 25, opts: [20,23,25,28]  },
-  { seq: [100,50,25,'?'], answer: 12.5, opts: [10,12.5,15,20] },
-  { seq: [2,3,5,8,'?'],   answer: 13, opts: [11,12,13,14]  },
-  { seq: [7,14,21,28,'?'],answer: 35, opts: [33,35,37,42]  },
-];
-let logic_correct;
-
-function startTest3() {
-  const q = logicSets[Math.floor(Math.random() * logicSets.length)];
-  logic_correct = q.answer;
-
-  const seqEl  = document.getElementById('logicSeq');
-  const optsEl = document.getElementById('logicOpts');
-
-  seqEl.innerHTML = q.seq.map(v =>
-    `<div class="logic-item${v==='?'?' blank':''}">${v}</div>`
-  ).join('');
-
-  const shuffled = [...q.opts].sort(() => Math.random() - 0.5);
-  optsEl.innerHTML = shuffled.map(v =>
-    `<div class="logic-opt" onclick="logicPick(this, ${v})">${v}</div>`
-  ).join('');
-}
-
-function logicPick(el, val) {
-  if (state.scores.logic !== 0) return; // already answered
-
-  document.querySelectorAll('.logic-opt').forEach(o => {
-    o.style.pointerEvents = 'none';
-    if (parseFloat(o.textContent) === logic_correct) o.classList.add('correct');
-  });
-
-  const correct = (val === logic_correct);
-  el.classList.add(correct ? 'correct' : 'wrong');
-  state.scores.logic = correct ? 100 : 0;
-  if (navigator.vibrate) navigator.vibrate(correct ? 40 : [30,20,30]);
-  setTimeout(nextTest, 900);
-}
-
-/* ===== FINISH & SCORE ===== */
-function finishTests() {
-  const score = Math.round(
-    state.scores.reaction * 0.35 +
-    state.scores.memory   * 0.35 +
-    state.scores.logic    * 0.30
-  );
-
-  // Save to history
-  const history = getHistory();
-  const today   = getTodayDate();
-  const existing = history.findIndex(x => x.date === today);
-  const entry   = { date: today, score, breakdown: {...state.scores} };
-  if (existing > -1) history[existing] = entry; else history.push(entry);
-  Store.set('bp_history', history.slice(-30));
-
-  // Update best
-  const prev = getBest();
-  if (score > prev) Store.set('bp_best', score);
+/* ===================================================
+   PROCESS CHECK-IN (the real reward logic)
+=================================================== */
+function processCheckin() {
+  const d = getData();
+  const t = today();
 
   // Update streak
-  const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
-  const yStr = yesterday.toISOString().slice(0,10);
-  const hasYest = history.find(x => x.date === yStr);
-  Store.set('bp_streak', hasYest ? getStreak() + 1 : 1);
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yStr = yesterday.toISOString().slice(0, 10);
 
-  // Update total
-  Store.set('bp_total', getTotalTests() + 1);
-
-  showResult(score, prev);
-}
-
-/* ===== RESULT SCREEN ===== */
-function showResult(score, prevBest) {
-  showScreen('result');
-
-  // Animate score ring (circumference ≈ 327)
-  const circ = 327;
-  const arc = document.getElementById('scoreArc');
-  arc.style.strokeDasharray = '0 ' + circ;
-  const target = (score / 100) * circ;
-  let cur = 0;
-  const step = target / 40;
-  const anim = setInterval(() => {
-    cur = Math.min(cur + step, target);
-    arc.style.strokeDasharray = cur + ' ' + (circ - cur);
-    if (cur >= target) clearInterval(anim);
-  }, 20);
-
-  // Animate number
-  let n = 0;
-  const el = document.getElementById('finalScore');
-  const numAnim = setInterval(() => {
-    n = Math.min(n + Math.ceil(score / 30), score);
-    el.textContent = n;
-    if (n >= score) clearInterval(numAnim);
-  }, 30);
-
-  const gl = gradeLabel(score);
-  document.getElementById('resultGrade').textContent = gl.grade;
-  document.getElementById('resultMsg').textContent   = gl.msg;
-
-  // Breakdown
-  document.getElementById('bk-react').textContent  = state.scores.reaction + '/100';
-  document.getElementById('bk-mem').textContent    = state.scores.memory   + '/100';
-  document.getElementById('bk-logic').textContent  = state.scores.logic    + '/100';
-
-  // Compare
-  const compareEl = document.getElementById('resultCompare');
-  if (!prevBest || prevBest === 0) {
-    compareEl.textContent = '🎉 First score saved! Come back tomorrow to beat it.';
-  } else if (score > prevBest) {
-    compareEl.textContent = `🏆 New personal best! +${score - prevBest} pts vs your previous best of ${prevBest}`;
-  } else {
-    compareEl.textContent = `Try beating your best: ${prevBest}/100 — only ${prevBest - score} pts away!`;
+  if (d.lastCheckin === yStr || d.lastCheckin === null) {
+    d.streak++;
+  } else if (d.lastCheckin !== t) {
+    d.streak = 1; // broken — restart
   }
+
+  d.longestStreak = Math.max(d.longestStreak || 0, d.streak);
+  d.totalDays++;
+  d.lastCheckin = t;
+  if (!d.checkIns.includes(t)) d.checkIns.push(t);
+
+  // XP calculation
+  const baseXP  = 50;
+  let bonusXP   = 0;
+  let bonusText = '';
+  if (d.streak === 7)  { bonusXP = 50;  bonusText = '🔥 7-day streak bonus!'; }
+  if (d.streak === 14) { bonusXP = 75;  bonusText = '⚡ 2-week streak bonus!'; }
+  if (d.streak === 30) { bonusXP = 150; bonusText = '🏆 1-month streak bonus!'; }
+  if (d.streak % 7 === 0 && d.streak > 0 && !bonusText) {
+    bonusXP = 25; bonusText = '📅 Weekly bonus!';
+  }
+  const earnedXP = baseXP + bonusXP;
+  d.totalXP += earnedXP;
+
+  // Savings
+  d.totalSaved = (d.totalSaved || 0) + (d.dailySaving || 20);
+
+  // Badge check
+  let newBadge = null;
+  BADGES.forEach(b => {
+    if (!d.badges.includes(b.id) && b.check(d.totalDays, d.streak, d.totalSaved)) {
+      d.badges.push(b.id);
+      newBadge = b;
+    }
+  });
+
+  saveData(d);
+
+  // Show reward screen
+  showReward(d, earnedXP, bonusText, newBadge);
 }
 
-function gradeLabel(score) {
-  if (score >= 90) return { grade: 'Genius 🧠',      msg: 'Exceptional cognitive performance today!' };
-  if (score >= 80) return { grade: 'Sharp Mind ⚡',   msg: 'Your brain is firing on all cylinders.' };
-  if (score >= 65) return { grade: 'Above Average 👍', msg: 'Solid performance. Push for a higher score!' };
-  if (score >= 50) return { grade: 'Average 🙂',       msg: 'Not bad! A bit more focus could boost your score.' };
-  return               { grade: 'Needs Work 💪',       msg: 'Come back tomorrow. Consistency builds sharpness!' };
+/* ===================================================
+   REWARD SCREEN
+=================================================== */
+function showReward(d, xp, bonusText, newBadge) {
+  showScreen('screen-reward');
+
+  document.getElementById('rewardTitle').textContent  = d.streak === 1 ? 'Day 1 Started!' : 'Clean Day Logged! ✓';
+  document.getElementById('rewardStreak').textContent = `🔥 ${d.streak}-Day Streak`;
+  document.getElementById('rewardXP').textContent     = '+' + xp + ' XP';
+  document.getElementById('rewardBonus').textContent  = bonusText || '';
+  document.getElementById('rewardSavings').textContent = '$' + (d.dailySaving || 20).toFixed(0);
+  document.getElementById('rewardTotal').textContent  = 'Total: $' + d.totalSaved.toFixed(0) + ' saved';
+  document.getElementById('rewardMsg').textContent    = REWARD_MSGS[Math.floor(Math.random() * REWARD_MSGS.length)];
+
+  if (newBadge) {
+    const rev = document.getElementById('badgeReveal');
+    rev.style.display = 'block';
+    document.getElementById('badgeRevealIcon').textContent = newBadge.emoji;
+    document.getElementById('badgeRevealName').textContent = newBadge.name;
+    if (navigator.vibrate) navigator.vibrate([50, 30, 50, 30, 80]);
+  } else {
+    document.getElementById('badgeReveal').style.display = 'none';
+  }
+
+  if (navigator.vibrate) navigator.vibrate(60);
 }
 
-/* ===== SHARE ===== */
+/* ===================================================
+   BADGE SCREEN
+=================================================== */
+function renderBadgesFull() {
+  const d = getData();
+  const el = document.getElementById('badgeFullGrid');
+  el.innerHTML = BADGES.map(b => {
+    const unlocked = d.badges.includes(b.id);
+    return `<div class="badge-full-item ${unlocked ? 'unlocked' : 'locked'}">
+      <div class="bfi-emoji">${b.emoji}</div>
+      <div class="bfi-name">${b.name}</div>
+      <div class="bfi-req">${unlocked ? '✓ Earned' : b.req}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ===================================================
+   SETTINGS SCREEN
+=================================================== */
+function renderSettings() {
+  const d = getData();
+  document.getElementById('setHabit').textContent      = d.habitIcon + ' ' + d.habitLabel;
+  document.getElementById('setSavingInput').value      = d.dailySaving || 20;
+}
+
+function updateSavings() {
+  const d = getData();
+  d.dailySaving = parseFloat(document.getElementById('setSavingInput').value) || 20;
+  saveData(d);
+  alert('Daily savings goal updated!');
+}
+
+function confirmRelapse() {
+  if (!confirm('Reset your streak to 0? Your XP and badges are kept.')) return;
+  const d = getData();
+  d.streak = 0;
+  d.lastCheckin = null;
+  saveData(d);
+  goHome();
+}
+
+function confirmReset() {
+  if (!confirm('Delete everything and start over? This cannot be undone.')) return;
+  localStorage.clear();
+  location.reload();
+}
+
+/* ===================================================
+   SHARE
+=================================================== */
 function shareTo(platform) {
-  const score = Store.get('bp_history')?.slice(-1)[0]?.score ?? '?';
-  const url   = encodeURIComponent(window.location.href);
-  const text  = encodeURIComponent(`I scored ${score}/100 on BrainPulse daily cognitive test! How sharp is YOUR brain? 🧠⚡`);
-  const urls  = {
-    facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}&quote=${text}`,
-    twitter:  `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
-    whatsapp: `https://wa.me/?text=${text}%20${url}`,
+  const d   = getData();
+  const url = encodeURIComponent(window.location.href);
+  const msg = encodeURIComponent(
+    `I'm on a ${d.streak}-day streak with no ${d.habitLabel}! 🔥 I've saved $${(d.totalSaved||0).toFixed(0)} so far. Try StayClean → `
+  );
+  const urls = {
+    facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}&quote=${msg}`,
+    twitter:  `https://twitter.com/intent/tweet?text=${msg}${url}`,
+    whatsapp: `https://wa.me/?text=${msg}${url}`,
   };
   window.open(urls[platform], '_blank', 'noopener,noreferrer');
 }
 
-/* ===== INIT ===== */
-renderHome();
-showScreen('home');
+/* ===================================================
+   SCREEN OVERRIDE — inject render calls
+=================================================== */
+const _showScreen = showScreen;
+window.showScreen = function(id) {
+  _showScreen(id);
+  if (id === 'screen-badges')  renderBadgesFull();
+  if (id === 'screen-settings') renderSettings();
+};
+
+/* ===================================================
+   INIT
+=================================================== */
+(function init() {
+  const d = getData();
+  if (!d.habit) {
+    showScreen('screen-onboard');
+  } else {
+    renderHome();
+    showScreen('screen-home');
+  }
+})();
